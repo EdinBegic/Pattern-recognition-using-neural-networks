@@ -8,9 +8,11 @@ from object_recognition import Object_Detector
 
 PROTOTXT_PATH = "MobileNetSSD_deploy.prototxt.txt"
 MODEL_PATH = "MobileNetSSD_deploy.caffemodel"
+
+
 class PatternRecognitionApp(tk.Frame):
     def __init__(self, master=None):
-        tk.Frame.__init__(self, master, relief=tk.SUNKEN, bd=2)
+        tk.Frame.__init__(self, master, pady=0)  # relief=tk.SUNKEN, bd=2)
 
         self.master.title("Pattern recognition")
         self.master.resizable(False, False)
@@ -21,10 +23,15 @@ class PatternRecognitionApp(tk.Frame):
         self.check_buttons = []
         self.checked_values = [IntVar() for i in range(20)]
         self.save_image_button = None
+        self.modified_pil_img = None
+        self.status_var = StringVar()
+        self.curr_img_var = StringVar()
 
         self.setup_image_frame()
         self.setup_cb_frame()
         self.setup_load_save_frame()
+        self.setup_menu()
+        self.setup_status_bar()
 
         exit_button = Button(self, text="Close", command=self.quit)
         exit_button.grid(row=2, column=1)
@@ -40,6 +47,8 @@ class PatternRecognitionApp(tk.Frame):
         self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_rowconfigure(1, weight=1)
         self.master.grid_rowconfigure(2, weight=1)
+        self.master.grid_rowconfigure(3, weight=1)
+
 
     def setup_image_frame(self):
         image_frame = Frame(self, padx=20, pady=20)
@@ -67,59 +76,122 @@ class PatternRecognitionApp(tk.Frame):
 
         self.apply_button = Button(cb_frame, text="Apply", command=self.apply_pattern_recognition)
         self.clear_button = Button(cb_frame, text="Clear all", command=self.clear_all)
+        self.apply_all_button = Button(cb_frame, text="Apply all", command=self.apply_all_patterns)
 
         for t in self.check_buttons:
             t[0].pack(anchor=W, fill=None, expand=False)
 
         self.apply_button.pack(pady=10, fill=None, expand=False, side=LEFT)
         self.clear_button.pack(padx=10, pady=10, fill=None, expand=False, side=RIGHT)
+        self.apply_all_button.pack(padx=5, pady=10, fill=None, expand=None)
+
         cb_frame.grid(row=0, column=1, sticky=W)
 
     def setup_load_save_frame(self):
-        load_save_frame = Frame(self)
+        load_save_frame = Frame(self, pady=10)
         load_image_button = Button(load_save_frame, text="Load image", command=self.load_image)
         self.save_image_button = Button(load_save_frame, text="Save modified image", command=self.save_image, state=DISABLED)
         load_image_button.pack(side=LEFT)
         self.save_image_button.pack(side=LEFT, padx=10)
         load_save_frame.grid(row=2, column=0)
 
+    def setup_menu(self):
+        menu = Menu(self.master)
+        self.master.config(menu=menu)
+
+        file_submenu = Menu(menu)
+        menu.add_cascade(label="File", menu=file_submenu)
+        file_submenu.add_command(label="New image", command=self.load_image)
+        file_submenu.add_separator()
+        file_submenu.add_command(label="Save changes", command=self.save_changes)
+        file_submenu.add_command(label="Save as...", command=self.save_image)
+        file_submenu.add_separator()
+        file_submenu.add_command(label="Exit", command=self.quit)
+
+        edit_submenu = Menu(menu)
+        menu.add_cascade(label="Edit", menu=edit_submenu)
+        edit_submenu.add_command(label="Apply selected patterns", command=self.apply_pattern_recognition)
+        edit_submenu.add_command(label="Apply all patterns", command=self.apply_all_patterns)
+        edit_submenu.add_separator()
+        edit_submenu.add_command(label="Restore original image", command=self.restore_original_image)
+
+        help_submenu = Menu(menu)
+        menu.add_cascade(label="Help", menu=help_submenu)
+        help_submenu.add_command(label="About", command=self.display_about_info)
+
+    def setup_status_bar(self):
+        status_bar = Frame(self, bd=1, relief=SUNKEN)
+        self.status_var.set("Status: None")
+        self.curr_img_var.set("Image: No image placeholder")
+        status = Label(status_bar, anchor=W, textvariable=self.status_var)
+        curr_img = Label(status_bar, anchor=W, textvariable=self.curr_img_var)
+        curr_img.pack(side=LEFT, fill=BOTH, expand=True)
+        status.pack(side=LEFT, fill=BOTH, expand=True)
+        status_bar.grid(row=3, column=0, columnspan=2, sticky="ew")
+
+    def set_status(self, status="", image=""):
+        self.status_var.set(status)
+        self.curr_img_var.set(image)
+
+    def clear_status(self):
+        self.set_status("")
+
     def load_image(self, filename=None):
-        if filename:
-            self.filename = filename
+        try:
+            if filename:
+                self.filename = filename
+            else:
+                self.reset()
+                self.filename = filedialog.askopenfilename(initialdir=os.getcwd(), title="Select image",
+                                                           filetypes=(("jpeg files", "*.jpg"), ("png files", "*.png")))
+            if self.filename:
+                self.cv2_img = cv2.imread(self.filename)
+                b, g, r = cv2.split(self.cv2_img)
+                self.img = cv2.merge((r, g, b))
+
+                self.original_pil_img = Image.fromarray(self.img)
+                self.original_pil_img.thumbnail((600, 600))
+                self.tk_photo = ImageTk.PhotoImage(self.original_pil_img)
+                self.image_label.configure(image=self.tk_photo)
+            self.set_status(status="Status: Successfully loaded image.", image=str(self.filename))
+        except Exception as e:
+            messagebox.showerror("Error", "An error occurred while loading image: \n" + str(e))
+            self.set_status(status="Error occured", image=str(self.filename))
+
+    def save_image(self, file=None):
+        try:
+            if not file:
+                file = filedialog.asksaveasfile(mode='w', defaultextension=".jpg")
+            if file:
+                if self.modified_pil_img:
+                    self.modified_pil_img.save(file)
+                else:
+                    self.original_pil_img.save(file)
+            self.set_status(status="Image saved successfully.", image=str(self.filename))
+        except Exception as e:
+            messagebox.showerror("Error", "An error occurred while saving image: \n" + str(e))
+
+    def save_changes(self):
+        if self.modified_pil_img:
+            try:
+                self.modified_pil_img.save(self.filename)
+                messagebox.showinfo("Success", "All changes saved successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", "An error occurred while saving changes: \n" + str(e))
+            self.set_status(status="Changes saved successfully.", image=str(self.filename))
         else:
-            self.reset()
-            self.filename = filedialog.askopenfilename(initialdir=os.getcwd(), title="Select image",
-                                                       filetypes=(("jpeg files", "*.jpg"), ("png files", "*.png")))
-        if self.filename:
-            self.cv2_img = cv2.imread(self.filename)
-            b, g, r = cv2.split(self.cv2_img)
-            self.img = cv2.merge((r, g, b))
+            messagebox.showinfo("Nothing to save", "Original image has not been modified.")
 
-            self.original_pil_img = Image.fromarray(self.img)
-            self.original_pil_img.thumbnail((600, 600))
-            self.tk_photo = ImageTk.PhotoImage(self.original_pil_img)
-            self.image_label.configure(image=self.tk_photo)
-
-    def save_image(self):
-        file = filedialog.asksaveasfile(mode='w', defaultextension=".jpg")
-        if file:
-            self.modified_pil_img.save(file)
-
-    def apply_pattern_recognition(self):
+    def apply_pattern_recognition(self, apply_all=False):
         any_selected = False
         allowed_labels = []
         for t in self.check_buttons:
-            if self.checked_values[t[1]].get():
+            if self.checked_values[t[1]].get() or apply_all:
                 self.save_image_button.config(state=NORMAL)
                 any_selected = True
-                # napomena na srbskom:
-                # ovo 'num' je redni broj iz one tvoje liste
-                # self.cv2_img sadrzi trenutnu sliku u cv2 formatu
                 allowed_labels.append(t[1])
-                # INJECT BEGA'S RECOGNITION LOGIC
-                # UPDATE VIEW
-                # self.update_image(modified_cv2_img) # slika koja je rezultat procesiranja ovog detektora
         if any_selected:
+            self.set_status(status="Status: Processing...", image=str(self.filename))
             object_detector = Object_Detector()
             object_detector.set_prototxt_path(PROTOTXT_PATH)
             object_detector.set_model_path(MODEL_PATH)
@@ -131,12 +203,17 @@ class PatternRecognitionApp(tk.Frame):
             self.update_image(object_detector.get_image())
             if len(not_found_labels) > 0:
                 label_string = '\n'.join(str(l) for l in not_found_labels)
-                messagebox.showwarning("Some objects not recognized", 
+                messagebox.showinfo("Some objects not recognized",
                     "The following objects are not recognized: \n" + label_string)
-        if not any_selected:
+            self.set_status(status="Status: Pattern recognition done.", image=str(self.filename))
+        else:
             self.tk_photo = ImageTk.PhotoImage(self.original_pil_img)
             self.image_label.configure(image=self.tk_photo)
             self.save_image_button.config(state=DISABLED)
+            messagebox.showinfo("Info", "Select one or more shapes/patterns.")
+
+    def apply_all_patterns(self):
+        self.apply_pattern_recognition(True)
 
     def update_image(self, cv2_img):
         b, g, r = cv2.split(cv2_img)
@@ -155,6 +232,15 @@ class PatternRecognitionApp(tk.Frame):
         self.clear_all()
         self.save_image_button.config(state=DISABLED)
         self.modified_pil_img = None
+
+    def restore_original_image(self):
+        self.tk_photo = ImageTk.PhotoImage(self.original_pil_img)
+        self.image_label.configure(image=self.tk_photo)
+        self.set_status(status="Original image restored.", image=str(self.filename))
+
+    def display_about_info(self):
+        messagebox.showinfo(title="About pattern recognition app",
+                            message="======Insert info======")
 
     def quit(self):
         self.master.destroy()
