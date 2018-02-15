@@ -26,19 +26,20 @@ def create_prediction(args, orig, img):
     # first load the model
     model = load_model(args["model"])
     # image classification
-    (cats, dogs, birds) = model.predict(img)[0]
+    (cats, dogs) = model.predict(img)[0]
     # setting the labels
     conffidence = 0
     label = ""
+    birds = 0
     if dogs > cats and dogs > birds:
         label = "Dog"
         conffidence = dogs
     elif cats > dogs and cats > birds:
         label = "Cat"
         conffidence = cats
-    elif birds > dogs and birds > cats:
-        label = "Bird"
-        conffidence = birds
+   # elif birds > dogs and birds > cats:
+   #     label = "Bird"
+   #     conffidence = birds
     label = "{}: {:.2f}%".format(label, conffidence * 100)
     output = imutils.resize(orig, width = 400)
     cv2.putText(output, label, (10, 25), cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 

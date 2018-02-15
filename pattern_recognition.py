@@ -4,8 +4,10 @@ import cv2
 from tkinter import filedialog, messagebox
 from tkinter import *
 from PIL import Image, ImageTk
+from object_recognition import Object_Detector
 
-
+PROTOTXT_PATH = "MobileNetSSD_deploy.prototxt.txt"
+MODEL_PATH = "MobileNetSSD_deploy.caffemodel"
 class PatternRecognitionApp(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master, relief=tk.SUNKEN, bd=2)
@@ -101,10 +103,11 @@ class PatternRecognitionApp(tk.Frame):
     def save_image(self):
         file = filedialog.asksaveasfile(mode='w', defaultextension=".jpg")
         if file:
-            self.pil_img.save(file)
+            self.modified_pil_img.save(file)
 
     def apply_pattern_recognition(self):
         any_selected = False
+        allowed_labels = []
         for t in self.check_buttons:
             if self.checked_values[t[1]].get():
                 self.save_image_button.config(state=NORMAL)
@@ -112,11 +115,24 @@ class PatternRecognitionApp(tk.Frame):
                 # napomena na srbskom:
                 # ovo 'num' je redni broj iz one tvoje liste
                 # self.cv2_img sadrzi trenutnu sliku u cv2 formatu
-                num = t[1]
+                allowed_labels.append(t[1])
                 # INJECT BEGA'S RECOGNITION LOGIC
                 # UPDATE VIEW
                 # self.update_image(modified_cv2_img) # slika koja je rezultat procesiranja ovog detektora
-
+        if any_selected:
+            object_detector = Object_Detector()
+            object_detector.set_prototxt_path(PROTOTXT_PATH)
+            object_detector.set_model_path(MODEL_PATH)
+            object_detector.set_image(self.cv2_img)
+            object_detector.load_model()
+            object_detector.load_image()
+            object_detector.forward_propagation_blob()
+            not_found_labels = object_detector.object_labeling(allowed_labels)
+            self.update_image(object_detector.get_image())
+            if len(not_found_labels) > 0:
+                label_string = '\n'.join(str(l) for l in not_found_labels)
+                messagebox.showwarning("Some objects not recognized", 
+                    "The following objects are not recognized: \n" + label_string)
         if not any_selected:
             self.tk_photo = ImageTk.PhotoImage(self.original_pil_img)
             self.image_label.configure(image=self.tk_photo)

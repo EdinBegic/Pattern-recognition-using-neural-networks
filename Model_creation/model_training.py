@@ -48,8 +48,8 @@ class TrainedModel:
                 label = 1
             elif label == "cats":
                 label = 0
-            elif label == "birds":
-                label = 2
+      #      elif label == "birds":
+      #          label = 2
             self.labels.append(label)
     
     def split_train_test_data(self,args):
@@ -87,7 +87,7 @@ def parsing_arguments():
 def main():
     ap = parsing_arguments()
     args = vars(ap.parse_args())
-    trained_model = TrainedModel(1, 1e-3, 32)
+    trained_model = TrainedModel(25, 1e-3, 32)
     trained_model.data_label_initialization(args)
     tr_X, te_X, tr_Y, te_Y = trained_model.split_train_test_data(args)
     trained_model.train_model(args, tr_X, te_X, tr_Y, te_Y)
