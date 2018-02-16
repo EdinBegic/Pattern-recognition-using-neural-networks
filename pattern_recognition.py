@@ -18,6 +18,7 @@ class PatternRecognitionApp(tk.Frame):
         self.master.resizable(False, False)
         self.placeholder_filename = "no-image.jpg"
         self.filename = None
+        self.inital_dir = os.getcwd()
         self.cv2_img = None
         self.img = None
         self.check_buttons = []
@@ -142,8 +143,9 @@ class PatternRecognitionApp(tk.Frame):
                 self.filename = filename
             else:
                 self.reset()
-                self.filename = filedialog.askopenfilename(initialdir=os.getcwd(), title="Select image",
+                self.filename = filedialog.askopenfilename(initialdir=self.inital_dir, title="Select image",
                                                            filetypes=(("jpeg files", "*.jpg"), ("png files", "*.png")))
+                self.inital_dir = os.path.dirname(self.filename)
             if self.filename:
                 self.cv2_img = cv2.imread(self.filename)
                 b, g, r = cv2.split(self.cv2_img)
