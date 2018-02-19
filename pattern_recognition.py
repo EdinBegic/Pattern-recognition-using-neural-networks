@@ -236,6 +236,7 @@ class PatternRecognitionApp(tk.Frame):
         self.modified_pil_img = None
 
     def restore_original_image(self):
+        self.load_image(self.filename)
         self.tk_photo = ImageTk.PhotoImage(self.original_pil_img)
         self.image_label.configure(image=self.tk_photo)
         self.set_status(status="Original image restored.", image=str(self.filename))
