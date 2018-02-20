@@ -1,6 +1,9 @@
 import os
 import tkinter as tk
 import cv2
+import imutils
+from imutils.video import VideoStream
+from imutils.video import FPS
 from tkinter import filedialog, messagebox
 from tkinter import *
 from PIL import Image, ImageTk
@@ -78,6 +81,7 @@ class PatternRecognitionApp(tk.Frame):
         self.apply_button = Button(cb_frame, text="Apply", command=self.apply_pattern_recognition)
         self.clear_button = Button(cb_frame, text="Clear all", command=self.clear_all)
         self.apply_all_button = Button(cb_frame, text="Apply all", command=self.apply_all_patterns)
+        self.real_time_detection = Button(cb_frame, text="Start real time detection", command=self.start_real_time_detection, bg = "red")
 
         for t in self.check_buttons:
             t[0].pack(anchor=W, fill=None, expand=False)
@@ -85,6 +89,7 @@ class PatternRecognitionApp(tk.Frame):
         self.apply_button.pack(pady=10, fill=None, expand=False, side=LEFT)
         self.clear_button.pack(padx=10, pady=10, fill=None, expand=False, side=RIGHT)
         self.apply_all_button.pack(padx=5, pady=10, fill=None, expand=None)
+        self.real_time_detection.pack(padx=5, pady=10, fill=None,  expand=None)
 
         cb_frame.grid(row=0, column=1, sticky=W)
 
@@ -214,6 +219,24 @@ class PatternRecognitionApp(tk.Frame):
             self.save_image_button.config(state=DISABLED)
             messagebox.showinfo("Info", "Select one or more shapes/patterns.")
 
+    def start_real_time_detection(self):
+        object_Detector = Object_Detector()
+        object_Detector.set_prototxt_path(PROTOTXT_PATH)
+        object_Detector.set_model_path(MODEL_PATH)
+        object_Detector.load_model()
+        messagebox.showinfo("Shortcut to end video stream",
+            "To end video stream press q")
+        video_stream = VideoStream(src=0).start()
+        while True:
+            frame = object_Detector.real_time_labeling(video_stream)
+            cv2.imshow("Frame", frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
+                break
+        cv2.destroyAllWindows()
+        video_stream.stop()
+
+        object_Detector.real_time_labeling()
     def apply_all_patterns(self):
         self.apply_pattern_recognition(True)
 

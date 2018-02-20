@@ -1,5 +1,8 @@
 import numpy as np
 import argparse
+import imutils
+from imutils.video import VideoStream
+from imutils.video import FPS
 import cv2
 
 def parsing_arguments():
@@ -37,10 +40,13 @@ class Object_Detector:
         # load the pretrained MobileNet SSD  model from the disk
         self.network = cv2.dnn.readNetFromCaffe(self.prototxt_path, self.model_path)
 
-    def load_image(self):
+    def load_image(self, is_video_frame = False, video_stream = None):
         # load the image from the disk and convert it to a blob
         # resize it to a 300x300 format and set the scalefactor to a predetermined value
         # last parameter represents the mean value
+        if is_video_frame == True:
+            self.img = video_stream.read()
+           # self.img = imutils.resize(self.img, width = 400)
         self.blob = cv2.dnn.blobFromImage(cv2.resize(self.img, (300, 300)), 0.007843, (300, 300), 127.5)
         # save the height and width information about iamge
         (self.h, self.w) = self.img.shape[:2]
@@ -51,6 +57,23 @@ class Object_Detector:
         # the results are detected objects on the image
         self.network.setInput(self.blob)
         self.objects = self.network.forward()
+
+    def _labeling_hepler(self,i, class_index):
+        border_box = self.objects[0, 0, i, 3:7] * np.array([self.w, self.h, self.w, self.h])
+        (coord1, coord2, coord3, coord4) = border_box.astype("int")
+        rectangle_top = (coord1, coord2)
+        rectangle_down = (coord3, coord4)
+        # displaying the prediction
+        cv2.rectangle(self.img,  rectangle_top, rectangle_down, self.label_colors[class_index], 2)
+        # calculate where to display object information
+        y = 0
+        if rectangle_top[1] - 15 > 15:
+            y = rectangle_top[1] - 15
+        else:
+            y = rectangle_top[1] + 15
+        label_information = "{}: {:.2f}%".format(self.labels[class_index], self.objects[0, 0, i, 2] * 100)
+        cv2.putText(self.img, label_information, (rectangle_top[0], y), 
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.label_colors[class_index], 2)
 
     def object_labeling(self, allowed_labels):
         counter = []
@@ -63,25 +86,20 @@ class Object_Detector:
             class_index = int(self.objects[0, 0, i, 1])
             if class_index in allowed_labels:
                 counter[allowed_labels.index(class_index)] += 1
-                border_box = self.objects[0, 0, i, 3:7] * np.array([self.w, self.h, self.w, self.h])
-                (coord1, coord2, coord3, coord4) = border_box.astype("int")
-                rectangle_top = (coord1, coord2)
-                rectangle_down = (coord3, coord4)
-                # displaying the prediction
-                cv2.rectangle(self.img,  rectangle_top, rectangle_down, self.label_colors[class_index], 2)
-                # calculate where to display object information
-                y = 0
-                if rectangle_top[1] - 15 > 15:
-                    y = rectangle_top[1] - 15
-                else:
-                    y = rectangle_top[1] + 15
-                label_information = "{}: {:.2f}%".format(self.labels[class_index], self.objects[0, 0, i, 2] * 100)
-                cv2.putText(self.img, label_information, (rectangle_top[0], y), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.label_colors[class_index], 2)
+                self._labeling_hepler(i, class_index)
         for i in range(len(counter)):
             if counter[i] == 0:
                 not_found_labels.append(self.labels[allowed_labels[i]])
         return not_found_labels
+
+    def real_time_labeling(self, video_stream):
+        self.load_image(True, video_stream)
+        self.forward_propagation_blob()
+        for i in np.arange(0, self.objects.shape[2]):
+            class_index = int(self.objects[0, 0, i, 1])
+            self._labeling_hepler(i, class_index)
+        return self.img
+
     def image_display(self, title=""):
         #display the image
         cv2.imshow(title, self.img)
